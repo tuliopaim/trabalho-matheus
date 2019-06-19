@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 //Neste trabalho será usado somente as primeiras 10.000 linhas
 #define QTD 10000
@@ -28,6 +29,13 @@ typedef struct _registro
     int proximo;
 } Registro;
 
+//struct para ler arquivo binario
+typedef struct _tableFile
+{
+    FILE * fp;
+    int header; //tamanho da tabela?
+}TableFile;
+
 
 //função para extrair dados do arquivo
 Pessoa parseData(char linha[]){
@@ -51,13 +59,38 @@ Pessoa parseData(char linha[]){
     return r;
 }
 
+int criaHeader(){
+    int header = QTD;
+    return header;
+}
+
+void leHeader(TableFile * tf){
+    rewind(tf->fp);
+    fread(tf->header, sizeof(int), 1, tf->fp);
+}
+
+void gravaHeader(TableFile * tf){
+    rewind(tf->fp);
+    fwrite(tf->header, sizeof(int), 1, tf->fp);
+}
+
+void gravaTabela(TableFile * tf, Registro * dados){
+    leHeader(tf);
+    fseek(tf->fp, sizeof(int), SEEK_SET); //move ponteiro apartir do começo do arquivo (pula o header)
+    int i = 0;
+    while(i < tf->header){
+        fwrite(&(dados[i].pessoa), sizeof(Registro), 1, tf->fp);
+        printf("Gravado registro %d - %s", dados[i].pessoa.linha, dados[i].pessoa.nome);
+    }
+}
+
 int main()
 {
     //dados[], uma array de Registros
     Registro dados[QTD];
 
     //Abaixo segue um exemplo de trecho de código para abrir, ler "todas" as linhas, processa-las e fechar o arquivo:
-
+    
     FILE *fp; // arquivo de texto
     char linha[MAXCHAR];
     char* filename = "dados-500000-win.csv";
@@ -70,12 +103,43 @@ int main()
     fgets(linha, MAXCHAR, fp); // ignorando a 1a linha
     int i = 0;
 
+    //ler linha por linha
     while ((i < QTD) && (fgets(linha, MAXCHAR, fp) != NULL)){
         dados[i].pessoa = parseData(linha);
         printf("%d - Address = %s\n",i , dados[i].pessoa.endereco);
         i++;
     }
     fclose(fp);
+
+    //Abaixo segue um exemplo de abertura de um arquivo binário:
+    
+    TableFile * tf = malloc(sizeof(TableFile));
+
+    char * header;
+
+    char* arquivo = "tabelaHash1.dat";
+
+    int result = access(arquivo, F_OK); // F_OK testa existencia.
+
+    //Sugestão, quando o arquivo for criado, já crie uma tabela hash para o total de registros a serem armazenados.
+    //Defina em seu layout um cabeçalho para te auxiliar a definir quantos registros há na tabela.
+
+    if (result == 0){
+    // Se o arquivo existe, abra e leia o header
+        printf("result == 0\n");
+        tf->fp = fopen(arquivo, "r+b");
+        leHeader(tf);
+    } else {
+    // Se o arquivo nao existe, crie-o, defina um header e escreva no arquivo
+        printf("result != 0\n");
+        tf->fp = fopen(arquivo, "w+b");        
+        tf->header = criaHeader();
+        gravaHeader(tf);
+    }
+
+    //gravar tabela
+
+    gravaTabela(tf,dados);
 
     return 0;    
 }
